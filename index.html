@@ -26,50 +26,42 @@
         {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
         {"role": "user", "content": "Where was it played?"}
         */
-        let messages = []
+       // let messages = []
         const chatLog = document.getElementById('chat-log');
         const message = document.getElementById('message');
         const form = document.querySelector('form');
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const messageText = message.value;
-            console.log(messageText);
-        //    const newMessage = {"role": "user", "content": `${messageText}`};
-        //    messages.push(newMessage);
             message.value = '';
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
             messageElement.classList.add('message--sent');
-            messageElement.innerHTML = `
-                <div class="message__text">${messageText}</div>
-            `;
+            messageElement.innerHTML = `<div class="message__text">${messageText}</div>`;
             chatLog.appendChild(messageElement);
-            chatlog.scrollTop = chatLog.scrollHeight;
+            chatLog.scrollTop = chatLog.scrollHeight;
             fetch('http://localhost:3000', {
-                
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    messages
+                    message: messageText
                 })
             })
-            .console.error()
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
-                let newAssistantMessage = {"role": "assistant", "content": `${data.completion.content}`};
-                messages.push(newAssistantMessage);
-                messages.push(newAssistantMessage);
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('message');
-                messageElement.classList.add('message--received');
-                messageElement.innerHTML = `
-                    <div class="message__text">${data.completion.content}</div>
-                `;
-                chatLog.appendChild(messageElement);
-                chatlog.scrollTop = chatLog.scrollHeight;
+                console.log('Success:', data);
+                const responseElement = document.createElement('div'); // define response element
+                responseElement.classList.add('message');
+                responseElement.classList.add('message--received');
+                responseElement.innerHTML = `<div class="message__text">${data.completion.content}</div>`;
+                chatLog.appendChild(responseElement);
+                chatLog.scrollTop = chatLog.scrollHeight;
             })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
         })
     </script>
 </body>
