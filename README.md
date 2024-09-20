@@ -12,7 +12,9 @@ This project is a Node.js application interfacing with the OpenAI GPT-3.5 API to
 
 ### Installation
 1. Clone the repository to your local machine.
-2. Navigate to the project directory and run `npm install` to install dependencies.
+2. Change name of sample_env.js to env.js
+3. Insert API key
+4. Navigate to the project directory in terminal and run `npm install` to install dependencies.
 
 ### Local Testing
 1. Start the server by running `node index.js` in your terminal. The server will start on `localhost:3000`.
