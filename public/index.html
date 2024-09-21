@@ -3,66 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Comaptible" content="ie=edge">
-    <title>GPT4 Chat API Model</title>
+    <title>GPT-4 Chat API Model</title>
     <link rel="stylesheet" href="./style.css">
-    <link rel = "icon" href = "./favicon.ico" type = "image/x-icon">
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
 </head>
 <body>
     <main>
-        <h1>ChatGPT4 API</h1>
-        <form action="">
+        <h1>ChatGPT-4 API</h1>
+        <form id="chat-form">
             <label for="message">Message:</label>
-            <input type="text" name="message" id="message" placeholder="Type your message here">
+            <input type="text" name="message" id="message" placeholder="Type your message here" required>
             <button type="submit">Send</button>
         </form>
-        <div id="chat-log">
-            
-        </div>
+        <div id="chat-log"></div>
     </main>
     <script>
-        let messages = []
-        const chatLog = document.getElementById('chat-log');
-        const message = document.getElementById('message');
-        const form = document.querySelector('form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const messageText = message.value;
-            const newMessage = {"role": "user", "content": messageText};
-            messages.push(newMessage);
-            message.value = '';
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message');
-            messageElement.classList.add('message--sent');
-            messageElement.innerHTML = `<div class="message__text">${messageText}</div>`;
-            chatLog.appendChild(messageElement);
-            chatLog.scrollTop = chatLog.scrollHeight;
-            fetch('http://localhost:3000', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    messages: messages
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Success:', data);
-                let newAssistantMessage = {"role": "assistant", "content": `${data.response}`};
-                messages.push(newAssistantMessage);
-                const responseElement = document.createElement('div');
-                responseElement.classList.add('message');
-                responseElement.classList.add('message--received');
-                responseElement.innerHTML = `<div class="message__text">${data.response}</div>`;
-                chatLog.appendChild(responseElement);
-                chatLog.scrollTop = chatLog.scrollHeight;
-            })
+        document.addEventListener('DOMContentLoaded', () => {
+            let messages = [];
+            const chatLog = document.getElementById('chat-log');
+            const messageInput = document.getElementById('message');
+            const form = document.getElementById('chat-form');
 
-            .catch((error) => {
-                console.error('Error:', error);
-            });
-        })
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const messageText = messageInput.value.trim();
+                    if (messageText === "") return;
+
+                    const newMessage = { "role": "user", "content": messageText };
+                    messages.push(newMessage);
+                    messageInput.value = '';
+
+                    // Display user's message
+                    const messageElement = document.createElement('div');
+                    messageElement.classList.add('message', 'message--sent');
+                    messageElement.innerHTML = `<div class="message__text">${messageText}</div>`;
+                    chatLog.appendChild(messageElement);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+
+                    // Display loading indicator
+                    const loadingElement = document.createElement('div');
+                    loadingElement.classList.add('message', 'message--loading');
+                    loadingElement.innerHTML = `<div class="message__text">Assistant is typing...</div>`;
+                    chatLog.appendChild(loadingElement);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+
+                    // Send message to server
+                    fetch('/', { // Relative URL ensures compatibility across environments
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ messages: messages })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => { throw new Error(text); });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Remove loading indicator
+                        chatLog.removeChild(loadingElement);
+
+                        if (data.error) {
+                            throw new Error(data.error.message || "Unknown error");
+                        }
+
+                        console.log('Success:', data);
+                        let newAssistantMessage = { "role": "assistant", "content": `${data.response}` };
+                        messages.push(newAssistantMessage);
+
+                        // Display assistant's response
+                        const responseElement = document.createElement('div');
+                        responseElement.classList.add('message', 'message--received');
+                        responseElement.innerHTML = `<div class="message__text">${data.response}</div>`;
+                        chatLog.appendChild(responseElement);
+                        chatLog.scrollTop = chatLog.scrollHeight;
+                    })
+                    .catch((error) => {
+                        // Remove loading indicator
+                        chatLog.removeChild(loadingElement);
+
+                        console.error('Error:', error);
+                        // Display error message to user
+                        const errorElement = document.createElement('div');
+                        errorElement.classList.add('message', 'message--error');
+                        errorElement.innerHTML = `<div class="message__text">An error occurred: ${error.message}</div>`;
+                        chatLog.appendChild(errorElement);
+                        chatLog.scrollTop = chatLog.scrollHeight;
+                    });
+                });
+            } else {
+                console.error('Form element not found in the DOM.');
+            }
+        });
     </script>
 </body>
 </html>
