@@ -21,12 +21,6 @@
         </div>
     </main>
     <script>
-        /*
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Who won the world series in 2020?"},
-        {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
-        {"role": "user", "content": "Where was it played?"}
-        */
         let messages = []
         const chatLog = document.getElementById('chat-log');
         const message = document.getElementById('message');
@@ -49,21 +43,22 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    messages
+                    messages: messages
                 })
             })
             .then(response => response.json())
             .then(data => {
                 console.log('Success:', data);
-                let newAssistantMessage = {"role": "assistant", "content": `${data.completion.content}`};
+                let newAssistantMessage = {"role": "assistant", "content": `${data.response}`};
                 messages.push(newAssistantMessage);
-                const responseElement = document.createElement('div'); // define response element
+                const responseElement = document.createElement('div');
                 responseElement.classList.add('message');
                 responseElement.classList.add('message--received');
-                responseElement.innerHTML = `<div class="message__text">${data.completion.content}</div>`;
+                responseElement.innerHTML = `<div class="message__text">${data.response}</div>`;
                 chatLog.appendChild(responseElement);
                 chatLog.scrollTop = chatLog.scrollHeight;
             })
+
             .catch((error) => {
                 console.error('Error:', error);
             });
