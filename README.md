@@ -17,7 +17,7 @@ This project is a Node.js application interfacing with the OpenAI GPT-3.5 API to
 4. Navigate to the project directory in terminal and run `npm install` to install dependencies.
 
 ### Local Testing
-1. Start the server by running `node index.js` in your terminal. The server will start on `localhost:3000`.
+1. Start the server by running `node ./src/index.js` in your terminal. The server will start on `localhost:3000`.
 2. For the best experience, open the `index.html` file using the Visual Studio Code extension for Live Server (ritwickdey.LiveServer). This extension provides a live preview of your HTML files, automatically refreshing them as you make changes.
 3. Alternatively, you can manually open the `index.html` file in your browser, but you won't have the live reload feature that the Live Server extension offers.
 
