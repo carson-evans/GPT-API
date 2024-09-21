@@ -21,11 +21,11 @@ This project is a Node.js application that interacts with the OpenAI GPT-4 API t
 ### Installation
 1. Clone the repository to your local machine:
 ```-bash
-git clone https://github.com/your-repo-url
+git clone https://github.com/carson-evans/GPT-API.git
 ```
 2. Navigate to the project directory:
 ```bash
-cd C:\code\GPT-API\GPT-API
+cd drive:\workspace\GPT-API
 ```
 3. Install the dependencies:
 ```bash
