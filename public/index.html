@@ -12,8 +12,46 @@
 <body>
     <header>
         <div class="logo">
-            <!-- Replace with actual logo -->
-            <img src="./logo.png" alt="ChatGPT-4 Logo" />
+            <!-- Inline SVG Logo -->
+            <svg 
+                width="50" 
+                height="50" 
+                viewBox="0 0 200 200" 
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <!-- Background Square -->
+                <rect width="200" height="200" rx="20" ry="20" fill="#4F46E5"/>
+
+                <!-- Chat Bubble -->
+                <path 
+                    d="M50,60 
+                       h100 
+                       a10,10 0 0 1 10,10 
+                       v60 
+                       a10,10 0 0 1 -10,10 
+                       h-50 
+                       l-20,20 
+                       v-20 
+                       h-30 
+                       a10,10 0 0 1 -10,-10 
+                       v-60 
+                       a10,10 0 0 1 10,-10 
+                       z" 
+                    fill="#ffffff"
+                />
+
+                <!-- GPT Text -->
+                <text 
+                    x="100" 
+                    y="125" 
+                    text-anchor="middle" 
+                    font-family="Roboto, sans-serif" 
+                    font-size="40" 
+                    fill="#4F46E5"
+                >
+                    GPT
+                </text>
+            </svg>
             <h1>ChatGPT-4 API</h1>
         </div>
     </header>
@@ -168,6 +206,6 @@
                 return messageElement;
             }
         });
-    </script>
-</body>
-</html>
+        </script>
+    </body>
+    </html>

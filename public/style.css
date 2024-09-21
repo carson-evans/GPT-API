@@ -29,13 +29,15 @@ header {
     align-items: center;
 }
 
-.logo img {
-    height: 40px;
+.logo img, .logo svg {
+    height: 50px; /* Adjust size as needed */
+    width: 50px;  /* Maintain aspect ratio */
     margin-right: 10px;
 }
 
 header h1 {
     font-size: 1.5rem;
+    font-weight: 500; /* Medium weight to match Roboto font */
 }
 
 /* Main Content Styles */
@@ -239,8 +241,9 @@ footer {
         font-size: 0.9rem;
     }
 
-    .logo img {
+    .logo img, .logo svg {
         height: 30px;
+        width: 30px;
         margin-right: 5px;
     }
 
