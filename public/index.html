@@ -6,17 +6,38 @@
     <title>GPT-4 Chat API Model</title>
     <link rel="stylesheet" href="./style.css">
     <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <header>
+        <div class="logo">
+            <!-- Replace with actual logo -->
+            <img src="./logo.png" alt="ChatGPT-4 Logo" />
+            <h1>ChatGPT-4 API</h1>
+        </div>
+    </header>
     <main>
-        <h1>ChatGPT-4 API</h1>
-        <form id="chat-form">
-            <label for="message">Message:</label>
-            <input type="text" name="message" id="message" placeholder="Type your message here" required>
-            <button type="submit">Send</button>
-        </form>
-        <div id="chat-log"></div>
+        <div id="chat-container">
+            <div id="chat-log" aria-live="polite" aria-atomic="false"></div>
+            <form id="chat-form" aria-label="Chat Form">
+                <label for="message" class="visually-hidden">Message:</label>
+                <input 
+                    type="text" 
+                    name="message" 
+                    id="message" 
+                    placeholder="Type your message here" 
+                    required 
+                    aria-required="true" 
+                    autocomplete="off"
+                >
+                <button type="submit" aria-label="Send Message">Send</button>
+            </form>
+        </div>
     </main>
+    <footer>
+        <p>&copy; 2024 Carson Evans. All rights reserved.</p>
+    </footer>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             let messages = [];
@@ -30,26 +51,22 @@
                     const messageText = messageInput.value.trim();
                     if (messageText === "") return;
 
+                    // Disable send button to prevent duplicate submissions
+                    const sendButton = form.querySelector('button[type="submit"]');
+                    sendButton.disabled = true;
+
                     const newMessage = { "role": "user", "content": messageText };
                     messages.push(newMessage);
                     messageInput.value = '';
 
                     // Display user's message
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add('message', 'message--sent');
-                    messageElement.innerHTML = `<div class="message__text">${messageText}</div>`;
-                    chatLog.appendChild(messageElement);
-                    chatLog.scrollTop = chatLog.scrollHeight;
+                    appendMessage('sent', messageText);
 
                     // Display loading indicator
-                    const loadingElement = document.createElement('div');
-                    loadingElement.classList.add('message', 'message--loading');
-                    loadingElement.innerHTML = `<div class="message__text">Assistant is typing...</div>`;
-                    chatLog.appendChild(loadingElement);
-                    chatLog.scrollTop = chatLog.scrollHeight;
+                    const loadingElement = appendMessage('loading', 'Assistant is typing...');
 
                     // Send message to server
-                    fetch('/', { // Relative URL ensures compatibility across environments
+                    fetch('/', { // Update the URL as needed
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -64,7 +81,9 @@
                     })
                     .then(data => {
                         // Remove loading indicator
-                        chatLog.removeChild(loadingElement);
+                        if (chatLog.contains(loadingElement)) {
+                            chatLog.removeChild(loadingElement);
+                        }
 
                         if (data.error) {
                             throw new Error(data.error.message || "Unknown error");
@@ -75,27 +94,78 @@
                         messages.push(newAssistantMessage);
 
                         // Display assistant's response
-                        const responseElement = document.createElement('div');
-                        responseElement.classList.add('message', 'message--received');
-                        responseElement.innerHTML = `<div class="message__text">${data.response}</div>`;
-                        chatLog.appendChild(responseElement);
-                        chatLog.scrollTop = chatLog.scrollHeight;
+                        appendMessage('received', data.response);
                     })
                     .catch((error) => {
                         // Remove loading indicator
-                        chatLog.removeChild(loadingElement);
+                        if (chatLog.contains(loadingElement)) {
+                            chatLog.removeChild(loadingElement);
+                        }
 
                         console.error('Error:', error);
                         // Display error message to user
-                        const errorElement = document.createElement('div');
-                        errorElement.classList.add('message', 'message--error');
-                        errorElement.innerHTML = `<div class="message__text">An error occurred: ${error.message}</div>`;
-                        chatLog.appendChild(errorElement);
-                        chatLog.scrollTop = chatLog.scrollHeight;
+                        appendMessage('error', `An error occurred: ${error.message}`);
+                    })
+                    .finally(() => {
+                        // Re-enable send button
+                        sendButton.disabled = false;
                     });
                 });
             } else {
                 console.error('Form element not found in the DOM.');
+            }
+
+            /**
+             * Appends a message to the chat log.
+             * @param {string} type - Type of the message ('sent', 'received', 'loading', 'error')
+             * @param {string} text - The message text
+             * @returns {HTMLElement} - The created message element
+             */
+            function appendMessage(type, text) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message', `message--${type}`);
+                
+                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                if (type === 'sent') {
+                    messageElement.innerHTML = `
+                        <div class="message__avatar">
+                            <img src="./user-avatar.png" alt="User Avatar">
+                        </div>
+                        <div class="message__content">
+                            <div class="message__text">${text}</div>
+                            <div class="message__timestamp">${timestamp}</div>
+                        </div>
+                    `;
+                } else if (type === 'received') {
+                    messageElement.innerHTML = `
+                        <div class="message__avatar">
+                            <img src="./assistant-avatar.png" alt="Assistant Avatar">
+                        </div>
+                        <div class="message__content">
+                            <div class="message__text">${text}</div>
+                            <div class="message__timestamp">${timestamp}</div>
+                        </div>
+                    `;
+                } else if (type === 'loading') {
+                    messageElement.innerHTML = `
+                        <div class="message__spinner"></div>
+                        <div class="message__content">
+                            <div class="message__text">${text}</div>
+                        </div>
+                    `;
+                } else if (type === 'error') {
+                    messageElement.innerHTML = `
+                        <div class="message__content">
+                            <div class="message__text">${text}</div>
+                            <div class="message__timestamp">${timestamp}</div>
+                        </div>
+                    `;
+                }
+
+                chatLog.appendChild(messageElement);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                return messageElement;
             }
         });
     </script>
