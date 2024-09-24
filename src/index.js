@@ -1,29 +1,45 @@
 // src/index.js
-import { MongoClient } from "mongodb";
-import OpenAI from "openai";
+import mongoose from 'mongoose';
+import OpenAI from 'openai';
 import { process } from "../env.js";
-import express from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
-import nodemailer from "nodemailer";
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 // Define __filename and __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configure MongoDB connection
-const client = new MongoClient(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+}).then(() => {
+    console.log("Connected to MongoDB successfully!");
+}).catch((error) => {
+    console.error("Error connecting to MongoDB:", error);
+});
 
-async function connectToDatabase() {
-    try {
-        await client.connect();
-        console.log("Connected to MongoDB successfully!");
-    } catch (error) {
-        console.error("Error connecting to MongoDB:", error);
-    }
-}
+// Define Mongoose schemas and models
+const userSchema = new mongoose.Schema({
+    username: String,
+    password: String, // Note: Passwords are hashed
+});
+
+const riskAnalysisSchema = new mongoose.Schema({
+    userID: mongoose.Schema.Types.ObjectId,
+    text: String,
+    analysisResult: Object,
+    timestamp: { type: Date, default: Date.now },
+});
+
+const User = mongoose.model('User', userSchema);
+const RiskAnalysis = mongoose.model('RiskAnalysis', riskAnalysisSchema);
 
 // Configure OpenAI API key
 const openai = new OpenAI({
@@ -39,33 +55,13 @@ app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static('public')); // Serves static files from the 'public' directory
 
-// Connect to database on server start
-connectToDatabase();
-
-// Database reference
-const db = client.db("sentimentMonintoringDB"); // Can be changed
-const usersCollection = db.collection("users");
-const sentimentCollection = db.collection("sentimentAnalysis");
-
-// Function to save sentiment analysis to MongoDB
-async function saveSentimentAnalysis(userID, text, sentimentResult) {
-    const sentimentRecord = {
-        userID,
-        text,
-        sentiment: sentimentResult,
-        timestamp: new Date(),
-    };
-    await sentimentCollection.insertOne(sentimentRecord);
-    console.log("Sentiment analysis saved to MongoDB:", sentimentRecord);
-}
-
 // Serve index.html for GET requests to '/'
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Handle POST requests to '/'
-app.post("/", async (req, res) => {
+app.post("/", authenticateUser, async (req, res) => {
     try {
         const { messages } = req.body;
 
@@ -85,9 +81,9 @@ app.post("/", async (req, res) => {
         const responseText = completion.choices[0].message.content;
         console.log("Assistant response:", responseText);
 
-        // Run sentiment analysis in the background (silent to user)
+        // Run risk analysis in the background (silent to user)
         const userMessage = messages.find(msg => msg.role === 'user')?.content || '';
-        await performSentimentAnalysis(userMessage);
+        await performRiskAnalysis(userMessage, req.user);
 
         res.json({ response: responseText });
     } catch (error) {
@@ -102,120 +98,141 @@ app.post("/", async (req, res) => {
     }
 });
 
-// Function to perform sentiment analysis (runs silently)
-async function performSentimentAnalysis(text) {
+// Function to perform risk analysis
+async function performRiskAnalysis(text, user) {
     if (!text) return;
 
     try {
-        // Use OpenAI's completion to perform sentiment analysis
-        const sentimentAnalysis = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "You are a sentiment analysis tool." },
-                { role: "user", content: `Analyze the sentiment of this text: "${text}"` },
-            ],
+        const moderationResponse = await openai.moderations.create({
+            input: text,
         });
 
-        const sentimentResult = sentimentAnalysis.choices[0].message.content;
-        console.log("Sentiment analysis result:", sentimentResult);
+        const results = moderationResponse.results[0];
+        const flaggedForSelfHarm = results.categories['self-harm'];
+        const selfHarmScore = results.category_scores['self-harm'];
 
-        // Optionally, send alerts or log sentiment
-        if (sentimentResult.includes("negative") || sentimentResult.includes("risk")) {
-            // Send alert or log potential risk (e.g., send an email or log to a database)
-            console.log("Potential negative sentiment detected:", sentimentResult);
+        console.log("Moderation results:", results);
+
+        if (flaggedForSelfHarm) {
+            console.log("Potential self-harm content detected:", text);
+            // Send alert email or take appropriate action
+            await sendAlertEmail(user, text, selfHarmScore);
+
+            // Optionally, send a supportive message to the user
+            // You can implement this based on your application's design
         }
+
+        // Save the analysis result to the database
+        await saveRiskAnalysis(user._id, text, results);
+
     } catch (error) {
-        console.error("Error performing sentiment analysis:", error);
+        console.error("Error performing risk analysis:", error);
     }
 }
 
-// User Login API (Basic - No encryption)
+// Function to save risk analysis to MongoDB
+async function saveRiskAnalysis(userID, text, analysisResult) {
+    const riskRecord = new RiskAnalysis({
+        userID,
+        text,
+        analysisResult,
+    });
+    await riskRecord.save();
+    console.log("Risk analysis saved to MongoDB:", riskRecord);
+}
+
+// User Registration API
+app.post("/register", async (req, res) => {
+    const { username, password } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
+    const newUser = new User({
+        username,
+        password: hashedPassword,
+    });
+
+    await newUser.save();
+
+    res.json({ message: "Registration successful" });
+});
+
+// User Login API
 app.post("/login", async (req, res) => {
-    const { username, password } = req.body; // This should be handled securely in a real app
-    const user = await usersCollection.findOne({ username, password });
+    const { username, password } = req.body;
+
+    // Find user by username
+    const user = await User.findOne({ username });
 
     if (!user) {
         return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate a simple session token (In production, use JWT)
-    const sessionToken = `session_${user._id}`;
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    res.json({ message: "Login successful", sessionToken });
+    if (!isMatch) {
+        return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({ message: "Login successful", token });
 });
 
 // Middleware to authenticate users
-async function authenticateUser(req, res, next) {
-    const { sessionToken } = req.headers;
-    if (!sessionToken) {
+function authenticateUser(req, res, next) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
         return res.status(401).json({ error: "Unauthorized" });
     }
-
-    const user = await usersCollection.findOne({ _id: sessionToken.replace('session_', '') });
-    if (!user) {
-        return res.status(401).json({ error: "Invalid session token" });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: "Invalid token" });
     }
-
-    req.user = user;
-    next();
 }
 
-// API endpoint to analyze sentiment
-app.post("/analyze-sentiment", authenticateUser, async (req, res) => {
-    try {
-        const { text } = req.body;
-
-        console.log("Received text for sentiment analysis:", text);
-
-        // Use OpenAI's completion to perform sentiment analysis
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "You are a sentiment analysis tool." },
-                { role: "user", content: `Analyze the sentiment of this text: "${text}"` },
-            ],
-        });
-
-        const sentimentResult = completion.choices[0].message.content;
-        console.log("Sentiment analysis result:", sentimentResult);
-
-        // Save the analysis result to the database with the user's ID
-        await saveSentimentAnalysis(req.user._id, text, sentimentResult);
-
-        res.json({ message: "Sentiment analysis saved", sentimentResult });
-    } catch (error) {
-        console.error("Error performing sentiment analysis:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Configure Nodemailer transport (using Gmail here, but can be any SMTP service)
+// Configure Nodemailer transport (using SendGrid)
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.sendgrid.net',
+    port: 587,
     auth: {
-        user: 'your-email@gmail.com',
-        pass: process.env.EMAIL_SERVICE_API_KEY // Use email service API key or password from env.js
+        user: 'apikey',
+        pass: process.env.EMAIL_SERVICE_API_KEY
     }
 });
 
 // Function to send email notification
-async function sendAlertEmail(user, sentimentResult) {
+async function sendAlertEmail(user, text, selfHarmScore) {
     const mailOptions = {
-        from: 'your-email@gmail.com',
-        to: 'counselor@domain.com', // Set to a counselor or alert recipient
-        subject: `Alert: Negative Sentiment Detected for ${user.username}`,
-        text: `A negative sentiment was detected in a message sent by ${user.username}. Sentiment: ${sentimentResult}`,
+        from: 'no-reply@yourdomain.com',
+        to: process.env.ALERT_EMAIL_RECIPIENT,
+        subject: `Urgent: Self-Harm Risk Detected for ${user.userId}`,
+        text: `A self-harm risk has been detected in a message from user ID: ${user.userId}.\n\nMessage: "${text}"\nSelf-Harm Score: ${selfHarmScore}\n\nPlease take appropriate action.`,
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            return console.log(error);
-        }
-        console.log('Email sent: ' + info.response);
-    });
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('Alert email sent successfully.');
+    } catch (error) {
+        console.error('Error sending alert email:', error);
+    }
 }
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
+    console.log(`App listening at http://localhost:${port}`);
 });

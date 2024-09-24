@@ -1,15 +1,20 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta Tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPT-4 Chat API Model</title>
-    <link rel="stylesheet" href="./style.css">
+    <title>GPT-4 Sentiment and Risk Analysis</title>
+    <!-- Favicon -->
     <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="./style.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Header Section -->
     <header>
         <div class="logo">
             <!-- Inline SVG Logo -->
@@ -52,11 +57,33 @@
                     GPT
                 </text>
             </svg>
-            <h1>ChatGPT-4 API</h1>
+            <h1>GPT-4 Sentiment and Risk Analysis</h1>
         </div>
     </header>
+
+    <!-- Main Content Section -->
     <main>
-        <div id="chat-container">
+        <!-- Authentication Container -->
+        <div id="auth-container">
+            <!-- Registration Form -->
+            <form id="register-form">
+                <h2>Register</h2>
+                <input type="text" id="register-username" placeholder="Username" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+
+            <!-- Login Form -->
+            <form id="login-form">
+                <h2>Login</h2>
+                <input type="text" id="login-username" placeholder="Username" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chat-container" style="display: none;">
             <div id="chat-log" aria-live="polite" aria-atomic="false"></div>
             <form id="chat-form" aria-label="Chat Form">
                 <label for="message" class="visually-hidden">Message:</label>
@@ -73,24 +100,82 @@
             </form>
         </div>
     </main>
+
+    <!-- Footer Section -->
     <footer>
         <p>&copy; 2024 Carson Evans. All rights reserved.</p>
     </footer>
+
+    <!-- JavaScript Section -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             let messages = [];
             const chatLog = document.getElementById('chat-log');
             const messageInput = document.getElementById('message');
-            const form = document.getElementById('chat-form');
+            const chatForm = document.getElementById('chat-form');
+            const authContainer = document.getElementById('auth-container');
+            const chatContainer = document.getElementById('chat-container');
 
-            if (form) {
-                form.addEventListener('submit', (e) => {
+            // Authentication Forms
+            const registerForm = document.getElementById('register-form');
+            const loginForm = document.getElementById('login-form');
+
+            let token = null; // JWT token
+
+            // Register Form Submission
+            registerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('register-username').value.trim();
+                const password = document.getElementById('register-password').value.trim();
+
+                fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    alert(data.message);
+                })
+                .catch(error => {
+                    alert(`Registration failed: ${error.message}`);
+                });
+            });
+
+            // Login Form Submission
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('login-username').value.trim();
+                const password = document.getElementById('login-password').value.trim();
+
+                fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    token = data.token;
+                    alert(data.message);
+                    authContainer.style.display = 'none';
+                    chatContainer.style.display = 'block';
+                })
+                .catch(error => {
+                    alert(`Login failed: ${error.message}`);
+                });
+            });
+
+            // Chat Form Submission
+            if (chatForm) {
+                chatForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     const messageText = messageInput.value.trim();
                     if (messageText === "") return;
 
                     // Disable send button to prevent duplicate submissions
-                    const sendButton = form.querySelector('button[type="submit"]');
+                    const sendButton = chatForm.querySelector('button[type="submit"]');
                     sendButton.disabled = true;
 
                     const newMessage = { "role": "user", "content": messageText };
@@ -104,10 +189,11 @@
                     const loadingElement = appendMessage('loading', 'Assistant is typing...');
 
                     // Send message to server
-                    fetch('/', { // Update the URL as needed
+                    fetch('/', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
                         },
                         body: JSON.stringify({ messages: messages })
                     })
@@ -153,12 +239,7 @@
                 console.error('Form element not found in the DOM.');
             }
 
-            /**
-             * Appends a message to the chat log.
-             * @param {string} type - Type of the message ('sent', 'received', 'loading', 'error')
-             * @param {string} text - The message text
-             * @returns {HTMLElement} - The created message element
-             */
+            // Function to append messages to the chat log
             function appendMessage(type, text) {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message', `message--${type}`);
@@ -206,6 +287,6 @@
                 return messageElement;
             }
         });
-        </script>
-    </body>
-    </html>
+    </script>
+</body>
+</html>
