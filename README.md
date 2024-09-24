@@ -41,7 +41,7 @@ This project is a Node.js application that interacts with the OpenAI GPT-4 API t
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/your-repo-url
+   git clone https://github.com/carson-evans/GPT-API.git
    ```
 
 2. **Navigate to the Project Directory**:
