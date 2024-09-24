@@ -1,15 +1,15 @@
 // src/index.js
 import mongoose from 'mongoose';
+import { process } from '../env.js';
 import OpenAI from 'openai';
-import { process } from "../env.js";
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import sgMail from '@sendgrid/mail';
 
 // Define __filename and __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -46,9 +46,12 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Configure SendGrid API key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 // Create Express app
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(bodyParser.json());
@@ -59,6 +62,22 @@ app.use(express.static('public')); // Serves static files from the 'public' dire
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Middleware to authenticate users
+function authenticateUser(req, res, next) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: "Invalid token" });
+    }
+}
 
 // Handle POST requests to '/'
 app.post("/", authenticateUser, async (req, res) => {
@@ -123,7 +142,7 @@ async function performRiskAnalysis(text, user) {
         }
 
         // Save the analysis result to the database
-        await saveRiskAnalysis(user._id, text, results);
+        await saveRiskAnalysis(user.userId, text, results);
 
     } catch (error) {
         console.error("Error performing risk analysis:", error);
@@ -189,46 +208,35 @@ app.post("/login", async (req, res) => {
     res.json({ message: "Login successful", token });
 });
 
-// Middleware to authenticate users
-function authenticateUser(req, res, next) {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (error) {
-        res.status(401).json({ error: "Invalid token" });
-    }
-}
-
-// Configure Nodemailer transport (using SendGrid)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.sendgrid.net',
-    port: 587,
-    auth: {
-        user: 'apikey',
-        pass: process.env.EMAIL_SERVICE_API_KEY
-    }
-});
-
-// Function to send email notification
+// Function to send email notification using SendGrid
 async function sendAlertEmail(user, text, selfHarmScore) {
-    const mailOptions = {
-        from: 'no-reply@yourdomain.com',
-        to: process.env.ALERT_EMAIL_RECIPIENT,
-        subject: `Urgent: Self-Harm Risk Detected for ${user.userId}`,
+    // If you're using a SendGrid dynamic template
+    const msg = {
+        to: process.env.ALERT_EMAIL_RECIPIENT, // recipient email
+        from: 'no-reply@yourdomain.com', // verified sender email
+        subject: `Urgent: Self-Harm Risk Detected for User ID ${user.userId}`,
+        // If using a template
+        // templateId: 'your-sendgrid-template-id',
+        // dynamicTemplateData: {
+        //     userId: user.userId,
+        //     message: text,
+        //     selfHarmScore: selfHarmScore,
+        //     // Add other dynamic data fields as needed
+        // },
+        // If not using a template
         text: `A self-harm risk has been detected in a message from user ID: ${user.userId}.\n\nMessage: "${text}"\nSelf-Harm Score: ${selfHarmScore}\n\nPlease take appropriate action.`,
+        // html: '<strong>Include HTML version if needed</strong>',
     };
 
     try {
-        await transporter.sendMail(mailOptions);
+        await sgMail.send(msg);
         console.log('Alert email sent successfully.');
     } catch (error) {
         console.error('Error sending alert email:', error);
+
+        if (error.response) {
+            console.error(error.response.body);
+        }
     }
 }
 
