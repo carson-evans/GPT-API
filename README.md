@@ -94,6 +94,7 @@ This project is a Node.js application that interacts with the OpenAI GPT-4 API t
 - Generate an API key and update the `EMAIL_SERVICE_API_KEY` in your `env.js`.
 - Verify your sender identity as per your email service's instructions.
 - Set the `ALERT_EMAIL_RECIPIENT` in your `env.js` to the email address where alerts should be sent.
+- Set the `from: 'no-reply@yourdomain.com'` in `index.js` to the verified sender email.
 
 ### JWT Secret
 
