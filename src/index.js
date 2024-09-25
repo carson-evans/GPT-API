@@ -1,4 +1,3 @@
-// src/index.js
 import mongoose from 'mongoose';
 import { process } from '../env.js';
 import OpenAI from 'openai';
